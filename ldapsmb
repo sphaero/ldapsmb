@@ -25,18 +25,18 @@ import binascii
 import crypt
 
 # path to configuration file
-cfgfile = '/etc/samba/ldapsmb.conf'
+cfgfile = 'ldapsmb.conf'
 
 
-class Config(object):
+class Config(ConfigParser.ConfigParser):
     '''Provide configuration parameters from external config file'''
     def __init__(self, filename):
-        self.config = ConfigParser.ConfigParser()
-        self.config.readfp(open(filename))
+        ConfigParser.ConfigParser.__init__(self)	
+        self.read(filename)
 
     def getOption(self, section, option):
         try:
-            return self.config.get(section, option)
+            return self.get(section, option)
         except ConfigParser.NoOptionError, e:
             return None
 
@@ -44,9 +44,9 @@ class Config(object):
         return self.getOption(section, option)
 
     def printOptions(self):
-        for section in self.config.sections():
+        for section in self.sections():
             print section
-            for pairs in self.config.items(section):
+            for pairs in self.items(section):
                 print pairs
 
 class LDAP(object):
@@ -55,6 +55,7 @@ class LDAP(object):
         self.ldap_session = self.connect(uri, binddn, passwd, usetls)
 
     def connect(self, uri, binddn, passwd, usetls):
+        ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
         session = ldap.initialize(uri)
 
         if usetls:
@@ -93,9 +94,9 @@ class Samba(LDAP):
         uri      = self.cfg.getOp('ldap', 'uri')
         binddn   = self.cfg.getOp('ldap', 'binddn')
         passwd   = self.cfg.getOp('ldap', 'passwd')
-        usetls   = self.cfg.getOp('ldap', 'usetls')
-
-        super().__init__(uri, binddn, passwd, bool(usetls))
+        usetls   = self.cfg.getboolean('ldap', 'usetls')
+        
+        super(Samba, self).__init__(uri, binddn, passwd, bool(usetls))
 
     def getNextFreeUid(self):
         suffix = self.cfg.getOp('samba', 'ldap suffix')
@@ -104,10 +105,12 @@ class Samba(LDAP):
         uid    = None
 
         result = self.ldap_search(suffix, filter, ['uidNumber'])
-
+        
         if result:
             uid = result[0][1]['uidNumber'][0]
-
+        else:
+            raise("can't find next free uid")
+            
         return uid
 
     def setNextFreeUid(self, uid):
