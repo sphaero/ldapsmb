@@ -95,7 +95,7 @@ class Samba(LDAP):
 		passwd   = self.cfg.getOp('ldap', 'passwd')
 		usetls   = self.cfg.getOp('ldap', 'usetls')
 
-		super(Samba, self).__init__(uri, binddn, passwd, bool(usetls))
+		super().__init__(uri, binddn, passwd, bool(usetls))
 
 	def getNextFreeUid(self):
 		suffix = self.cfg.getOp('samba', 'ldap suffix')
