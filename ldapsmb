@@ -339,7 +339,8 @@ class Samba(LDAP):
 		pass
 
 	def createPosixUser(self, name, uid=None, gid=None, home=None,
-						loginShell=None, displayName=None, gecos=None):
+						loginShell=None, displayName=None, gecos=None,
+						mail=None, mobile=None):
 		suffix       = self.cfg.getOp('samba', 'ldap suffix')
 		user_suffix  = self.cfg.getOp('samba', 'ldap user suffix')
 		objClasses   = ['top', 'person', 'organizationalPerson',
@@ -352,15 +353,18 @@ class Samba(LDAP):
 			uid = self.getNextFreeUid()
 			self.setNextFreeUid(str(int(uid)+1))
 		if not gid:
-			gid = '513'	# 'Domain Users'
+			gid = self.cfg.getOp('posix', 'defaultGidNumber')
 		if not home:
-			home = '/home/' + name
+            defHomePath = self.cfg.getOp('posix', 'homeDirPath')
+			home = defHomePath + "/" + name
 		if not loginShell:
-			loginShell = '/bin/false'
+			loginShell = self.cfg.getOp('posix', 'defaultShell')
 		if not displayName:
 			displayName = name
 		if not gecos:
 			gecos = name
+        if not mail:
+            mail = name + "@" + self.cfg.getOp('posix', 'mailDomain')
 
 		attrs = [
 			('objectClass', objClasses ),
@@ -372,7 +376,9 @@ class Samba(LDAP):
 			('uidNumber', [uid]),
 			('gidNumber', [gid]),
 			('homeDirectory', [home]),
-			('loginShell', [loginShell])
+			('loginShell', [loginShell]),
+            ('mail', [mail]),
+            ('mobile', [mobile])
 		]
 
 		try:
