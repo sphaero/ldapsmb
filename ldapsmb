@@ -424,14 +424,6 @@ class Samba(LDAP):
             rid = self.getNextFreeRid()
             sambaSID = self.getDomainSID() + '-' + rid
             self.setNextFreeRid(str(int(rid)+1))
-        if not sambaPrimaryGroupSID:
-            sambaPrimaryGroupSID = self.getDomainSID() + '-' + gid
-        if not sambaProfilePath:
-            sambaProfilePath = self.cfg.getOp('samba', 'sambaProfilePath')
-        if not sambaHomePath:
-            sambaHomePath = self.cfg.getOp('samba', 'sambaHomePath')
-        if not sambaHomeDrive:
-            sambaHomeDrive = self.cfg.getOp('samba', 'sambaHomeDrive')
         if not sambaAccountFlags:
             sambaAccountFlags = '[U          ]'
         if not mail:
@@ -456,6 +448,14 @@ class Samba(LDAP):
         ]
         if mobile:
             attrs.append(('mobile', [mobile]))
+        if sambaPrimaryGroupSID:
+            attrs.append(('sambaPrimaryGroupSID', [sambaPrimaryGroupSID]))
+        if sambaProfilePath:
+            attrs.append(('sambaProfilePath', [sambaPrimaryGroupSID]))
+        if sambaHomePath:
+            attrs.append(('sambaHomePath', [sambaPrimaryGroupSID]))
+        if sambaHomeDrive:
+            attrs.append(('sambaHomeDrive', [sambaPrimaryGroupSID]))
         if sambaLogonScript:
             attrs.append(('sambaLogonScript', [sambaLogonScript]))
         if sambaProfilePath:
