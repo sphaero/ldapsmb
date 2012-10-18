@@ -377,10 +377,11 @@ class Samba(LDAP):
             ('gidNumber', [gid]),
             ('homeDirectory', [home]),
             ('loginShell', [loginShell]),
-            ('mail', [mail]),
-            ('mobile', [mobile])
+            ('mail', [mail])
         ]
-
+        
+        if mobile:
+            attrs.append(('mobile', [mobile]))
         try:
             self.ldap_add(dn, attrs)
             self.setNextFreeUid(str(int(uid) + 1))
@@ -393,11 +394,11 @@ class Samba(LDAP):
             print dn + ':', e.args
 
     def createSambaUser(self, name, uid=None, gid=None, home=None,
-                        loginShell=None, displayName=None, gecos=None,
+                        loginShell=None, givenName=None, sn=None,
                         sambaSID=None, sambaPrimaryGroupSID=None,
                         sambaProfilePath=None, sambaHomePath=None,
                         sambaHomeDrive=None, sambaLogonScript=None,
-                        sambaAccountFlags=None):
+                        sambaAccountFlags=None, mail=None):
 
         suffix       = self.cfg.getOp('samba', 'ldap suffix')
         user_suffix  = self.cfg.getOp('samba', 'ldap user suffix')
@@ -409,19 +410,22 @@ class Samba(LDAP):
             uid = self.getNextFreeUid()
             self.setNextFreeUid(str(int(uid)+1))
         if not gid:
-            gid = '513' # 'Domain Users'
+            gid = self.cfg.getOp('posix', 'defaultGidNumber')
+        if not home:
+            defHomePath = self.cfg.getOp('posix', 'homeDirPath')
+            home = defHomePath + "/" + name
         if not loginShell:
-            loginShell = '/bin/false'
+            loginShell = self.cfg.getOp('posix', 'defaultShell')
+        if not givenName:
+            givenName = name
+        if not sn:
+            sn = name
         if not sambaSID:
             rid = self.getNextFreeRid()
             sambaSID = self.getDomainSID() + '-' + rid
             self.setNextFreeRid(str(int(rid)+1))
         if not sambaPrimaryGroupSID:
             sambaPrimaryGroupSID = self.getDomainSID() + '-' + gid
-        if not displayName:
-            displayName = name
-        if not home:
-            home = '/home/' + name
         if not sambaProfilePath:
             sambaProfilePath = self.cfg.getOp('samba', 'sambaProfilePath')
         if not sambaHomePath:
@@ -430,25 +434,28 @@ class Samba(LDAP):
             sambaHomeDrive = self.cfg.getOp('samba', 'sambaHomeDrive')
         if not sambaAccountFlags:
             sambaAccountFlags = '[U          ]'
+        if not mail:
+            mail = name + "@" + self.cfg.getOp('posix', 'mailDomain')
 
         dn = 'uid=%s,%s,%s' % (name, user_suffix, suffix)
 
         attrs = [
             ('objectClass', objClasses ),
-            ('cn', [name]),
-            ('sn', [name]),
+            ('cn', [givenName + " " + sn]),
+            ('sn', [sn]),
             ('uid', [name]),
             ('uidNumber', [uid]),
             ('gidNumber', [gid]),
-            ('displayName', [displayName]),
-            ('gecos', [displayName]),
+            ('displayName', [givenName + " " + sn]),
+            ('gecos', [givenName + " " + sn]),
             ('homeDirectory', [home]),
             ('loginShell', [loginShell]),
             ('sambaSID', [sambaSID]),
             ('sambaPrimaryGroupSID', [sambaPrimaryGroupSID]),
             ('sambaAcctFlags', [sambaAccountFlags])
         ]
-
+        if mobile:
+            attrs.append(('mobile', [mobile]))
         if sambaLogonScript:
             attrs.append(('sambaLogonScript', [sambaLogonScript]))
         if sambaProfilePath:
