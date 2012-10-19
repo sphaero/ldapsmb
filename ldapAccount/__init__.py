@@ -1,10 +1,13 @@
 #!/usr/bin/python
 ## vim: set ts=2 sw=2 noai noet
+##
 ## purpose: LDAP Samba user, group and computer account management
 ## copyright: B1 Systems GmbH <info@b1-systems.de>, 2011.
+## modifications by: Arnaud Loonstra <arnaud@sphaero.org>, 2012.
 ## license: GPLv3+, http://www.gnu.org/licenses/gpl-3.0.html
 ## author: Uwe Grawert <grawert@b1-systems.de>, 2011.
-## version: 0.1: user,group,computer management 20111025.
+## author: Arnaud Loonstra <arnaud@sphaero.org>, 2012
+## version: 0.2: user,group,computer management 20121019.
 ##
 ## TODO:
 ## - syntax check the configuration file ldapsmb.conf
@@ -88,8 +91,8 @@ class LDAP(object):
         attrs = [(ldap.MOD_DELETE, attribute, values)]
         self.ldap_session.modify_s(dn, attrs)
 
-class Samba(LDAP):
-    '''Management of Samba domain data in LDAP'''
+class Account(LDAP):
+    '''Management of user account data in LDAP'''
     def __init__(self, configFile):
         self.cfg = Config(configFile)
         uri      = self.cfg.getOp('ldap', 'uri')
@@ -97,7 +100,7 @@ class Samba(LDAP):
         passwd   = self.cfg.getOp('ldap', 'passwd')
         usetls   = self.cfg.getboolean('ldap', 'usetls')
         
-        super(Samba, self).__init__(uri, binddn, passwd, bool(usetls))
+        super(Account, self).__init__(uri, binddn, passwd, bool(usetls))
 
     def getNextFreeUid(self):
         suffix = self.cfg.getOp('samba', 'ldap suffix')
@@ -188,6 +191,20 @@ class Samba(LDAP):
             gid = result[0][1]['gidNumber'][0]
 
         return gid
+    
+    def getGidName(self, gid):
+        suffix      = self.cfg.getOp('samba', 'ldap suffix')
+        group_suffix = self.cfg.getOp('samba', 'ldap group suffix')
+        search_dn   = '%s,%s' % (group_suffix, suffix)
+        filter      = 'gidNumber=%s' % (gid)
+        groupName   = None
+
+        result = self.ldap_search(search_dn, filter, ['cn'])
+
+        if result:
+            groupName = result[0][1]['cn'][0]
+
+        return groupName
 
     def getDomainSID(self):
         suffix = self.cfg.getOp('samba', 'ldap suffix')
@@ -397,12 +414,13 @@ class Samba(LDAP):
         except ldap.LDAPError, e:
             print dn + ':', e.args
 
-    def createSambaUser(self, name, uid=None, gid=None, home=None,
-                        loginShell=None, givenName=None, sn=None,
-                        sambaSID=None, sambaPrimaryGroupSID=None,
-                        sambaProfilePath=None, sambaHomePath=None,
-                        sambaHomeDrive=None, sambaLogonScript=None,
-                        sambaAccountFlags=None, mail=None, mobile=None):
+    def createSambaUser(self, name, **kwargs):
+        #gid=None, home=None,
+                        #loginShell=None, givenName=None, sn=None,
+                        #sambaSID=None, sambaPrimaryGroupSID=None,
+                        #sambaProfilePath=None, sambaHomePath=None,
+                        #sambaHomeDrive=None, sambaLogonScript=None,
+                        #sambaAccountFlags=None, mail=None, mobile=None):
 
         suffix       = self.cfg.getOp('samba', 'ldap suffix')
         user_suffix  = self.cfg.getOp('samba', 'ldap user suffix')
@@ -410,63 +428,47 @@ class Samba(LDAP):
                          'sambaSamAccount', 'posixAccount', 'shadowAccount']
 
         # set defaults
+        uid                 = kwargs.pop('uid', None)
         if not uid:
             uid = self.getNextFreeUid()
             self.setNextFreeUid(str(int(uid)+1))
-        if not gid:
-            gid = self.cfg.getOp('posix', 'defaultGidNumber')
-        if not home:
-            defHomePath = self.cfg.getOp('posix', 'homeDirPath')
-            home = defHomePath + "/" + name
+        gid                 = kwargs.pop('uid', self.cfg.getOp('posix', 'defaultGidNumber'))
+        defHomePath = self.cfg.getOp('posix', 'homeDirPath')
+        home                = kwargs.pop('home', defHomePath + "/" + name)
+        loginShell          = kwargs.pop('loginShell', None)
         if not loginShell:
             loginShell = self.cfg.getOp('posix', 'defaultShell')
-        if not givenName:
-            givenName = name
-        if not sn:
-            sn = name
+        givenName           = kwargs.pop('givenName', name)
+        sn                  = kwargs.pop('sn', name)
+        sambaSID            = kwargs.pop('sambaSID', None)
         if not sambaSID:
             rid = self.getNextFreeRid()
             sambaSID = self.getDomainSID() + '-' + rid
             self.setNextFreeRid(str(int(rid)+1))
-        if not sambaAccountFlags:
-            sambaAccountFlags = '[U          ]'
-        if not mail:
-            mail = name + "@" + self.cfg.getOp('posix', 'mailDomain')
-
+        sambaAccountFlags   = kwargs.pop('sambaAccountFlags', '[U          ]')
+        
         dn = 'uid=%s,%s,%s' % (name, user_suffix, suffix)
 
-        attrs = {}
-        attrs['objectClass'] = objClasses
-        attrs['cn'] = givenName + " " + sn
-        attrs['sn'] = sn
-        attrs['uid'] = name
-        attrs['uidNumber'] = uid
-        attrs['gidNumber'] = gid
-        attrs['displayName'] = givenName + " " + sn
-        attrs['gecos'] = givenName + " " + sn
-        attrs['homeDirectory'] = home
-        attrs['loginShell'] = loginShell
-        attrs['sambaSID'] = sambaSID
-        attrs['sambaAcctFlags'] = sambaAccountFlags
-
-        if mobile:
-            attrs.append(('mobile', [mobile]))
-        if sambaPrimaryGroupSID:
-            attrs.append(('sambaPrimaryGroupSID', [sambaPrimaryGroupSID]))
-        if sambaProfilePath:
-            attrs.append(('sambaProfilePath', [sambaPrimaryGroupSID]))
-        if sambaHomePath:
-            attrs.append(('sambaHomePath', [sambaPrimaryGroupSID]))
-        if sambaHomeDrive:
-            attrs.append(('sambaHomeDrive', [sambaPrimaryGroupSID]))
-        if sambaLogonScript:
-            attrs.append(('sambaLogonScript', [sambaLogonScript]))
-        if sambaProfilePath:
-            attrs.append(('sambaProfilePath', [sambaProfilePath]))
-        if sambaHomePath:
-            attrs.append(('sambaHomePath', [sambaHomePath]))
-        if sambaHomeDrive:
-            attrs.append(('sambaHomeDrive', [sambaHomeDrive]))
+        attrs = {
+                'objectClass': objClasses,
+                'cn': givenName + " " + sn,
+                'givenName': givenName,
+                'sn': sn,
+                'uid': name,
+                'uidNumber': uid,
+                'gidNumber': gid,
+                'displayName': givenName + " " + sn,
+                'gecos': givenName + " " + sn,
+                'homeDirectory': home,
+                'loginShell': loginShell,
+                'sambaSID': sambaSID,
+                'sambaAcctFlags': sambaAccountFlags
+                }
+                
+        #append remaing values, filter None values
+        for key,value in kwargs.iteritems():
+            if not value == None:
+                attrs[key] = value
 
         print dn, attrs
         addAttrs = ldap.modlist.addModlist(attrs)
@@ -481,6 +483,11 @@ class Samba(LDAP):
             print dn + ': Invalid attribute syntax. Is samba3 schema installed?'
         except ldap.LDAPError, e:
             print dn + ':', e.args
+            
+        #finally add user to it's primaryGroup
+        group = self.getGidName(gid)
+        if group:
+            self.addUserToGroup(name, group)
 
     def modifyUser(self, name, attribute, value):
         suffix       = self.cfg.getOp('samba', 'ldap suffix')
@@ -773,7 +780,7 @@ class Population(object):
        domain groups, and basic users'''
     def __init__(self, configFile):
         self.cfg = Config(configFile)
-        self.smb = Samba(configFile)
+        self.smb = Account(configFile)
 
     def createSambaDomain(self):
         self.smb.createSambaDomain()
@@ -998,7 +1005,7 @@ def manage_user(argv):
     if not options.add and not options.delete and not options.modify:
         parser.error('Please specify an action! Use option --help')
 
-    samba = Samba(cfgfile)
+    samba = Account(cfgfile)
 
     if options.add:
         uid = None; gid = None; sambaAccountFlags=None
