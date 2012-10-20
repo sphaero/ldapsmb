@@ -1,6 +1,5 @@
 [ldap]
-uri    = ldap://ldap.b1-systems.de
-port   = 389
+uri    = ldap://ldap.b1-systems.de:389
 binddn = cn=admin,dc=b1-systems,dc=de
 passwd = setme
 
@@ -27,3 +26,7 @@ sambaProfilePath = \\PDC\profiles
 sambaHomePath = \\PDC
 sambaHomeDrive = H:
 
+[posix]
+homeDirPath = /home
+defaultGidNumber=10000
+defaultShell = /bin/bash
