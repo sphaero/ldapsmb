@@ -958,8 +958,8 @@ def manage_user(argv):
     usage = '%prog user [-h | --help] | -n <name> [Options]'
     parser = optparse.OptionParser(usage)
     parser.add_option("-a", "--add", dest='add', help='add new user')
-    parser.add_option("-d", "--delete", dest='delete', help='delete existing user', action='store_true')
-    parser.add_option("-m", "--modify", dest='modify', help='modify user properties', action='store_true')
+    parser.add_option("-d", "--delete", dest='delete', help='delete existing user')
+    parser.add_option("-m", "--modify", dest='modify', help='modify user properties')
     parser.add_option("-R", "--remove", dest='remove', help='remove a user property (with --modify)', action='store_true')
     parser.add_option("-u", "--uidNumber", dest='uidNumber', help='create new user with uidNumber')
     parser.add_option("-g", "--gidNumber", dest='gidNumber', help='create new user with gidNumber')
@@ -1038,8 +1038,9 @@ def manage_user(argv):
         acc.deleteUser(options.delete)
 
     if options.modify:
+        print options.groupName
         if options.groupName:
-            for id, groupname in enumerate(options.groupName):
+            for groupname in options.groupName:
                 if options.remove:
                     acc.deleteUserFromGroup(options.modify, groupname)
                 else:
