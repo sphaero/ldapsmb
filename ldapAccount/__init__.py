@@ -403,7 +403,7 @@ class Account(LDAP):
                 attrs[key] = value
         addAttrs = ldap.modlist.addModlist(attrs)
         try:
-            self.ldap_add(dn, attrs)
+            self.ldap_add(dn, addAttrs)
             self.setNextFreeUid(str(int(uid) + 1))
             print dn + ': Successfully created'
         except ldap.ALREADY_EXISTS, e:
@@ -412,6 +412,11 @@ class Account(LDAP):
             print dn + ': No such object!'
         except ldap.LDAPError, e:
             print dn + ':', e.args
+
+        #finally add user to it's primaryGroup
+        group = self.getGidName(gid)
+        if group:
+            self.addUserToGroup(name, group)
 
     def createSambaUser(self, name, **kwargs):
         suffix       = self.cfg.getOp('samba', 'ldap suffix')
@@ -435,7 +440,7 @@ class Account(LDAP):
         if not sambaSID:
             rid = self.getNextFreeRid()
             sambaSID = self.getDomainSID() + '-' + rid
-        sambaAccountFlags   = kwargs.pop('sambaAccountFlags', '[U          ]')
+        sambaAcctFlags   = kwargs.pop('sambaAcctFlags', '[U          ]')
         
         dn = 'uid=%s,%s,%s' % (name, user_suffix, suffix)
 
@@ -452,7 +457,7 @@ class Account(LDAP):
                 'homeDirectory': home,
                 'loginShell': loginShell,
                 'sambaSID': sambaSID,
-                'sambaAcctFlags': sambaAccountFlags
+                'sambaAcctFlags': sambaAcctFlags
                 }
                 
         #append remaing values, filter None values
@@ -574,7 +579,7 @@ class Account(LDAP):
     def createSambaMachine(self, name, uid=None, gid=None, displayName=None,
                            sambaSID=None, sambaPrimaryGroupSID=None,
                            gecos=None, loginShell='/bin/false', home='/dev/null',
-                           sambaAccountFlags=None):
+                           sambaAcctFlags=None):
         suffix         = self.cfg.getOp('samba', 'ldap suffix')
         machine_suffix = self.cfg.getOp('samba', 'ldap machine suffix')
         objClasses     = ['top', 'person', 'organizationalPerson',
@@ -598,8 +603,8 @@ class Account(LDAP):
             displayName = name.upper()
         if not gecos:
             gecos = 'Computer'
-        if not sambaAccountFlags:
-            sambaAccountFlags = '[W          ]'
+        if not sambaAcctFlags:
+            sambaAcctFlags = '[W          ]'
 
         dn = 'uid=%s,%s,%s' % (name, machine_suffix, suffix)
 
@@ -614,7 +619,7 @@ class Account(LDAP):
             ('gidNumber', [gid]),
             ('sambaSID', [sambaSID]),
             ('sambaPrimaryGroupSID', [sambaPrimaryGroupSID]),
-            ('sambaAcctFlags', [sambaAccountFlags]),
+            ('sambaAcctFlags', [sambaAcctFlags]),
             ('loginShell', [loginShell]),
             ('homeDirectory', [home])
         ]
@@ -807,7 +812,7 @@ class Population(object):
                                      sambaPrimaryGroupSID=property['sambaPrimaryGroupSID'],
                                      displayName=property['displayName'],
                                      gecos=property['displayName'],
-                                     sambaAccountFlags=property['acctFlags'])
+                                     sambaAcctFlags=property['acctFlags'])
             # ask for root password
             if property['uid'] == '0':
                 password = getpass.getpass('Password for root: ')
@@ -980,6 +985,7 @@ def manage_user(argv):
     parser.add_option("-A", "--canChangePassword", dest='canChangePassword', help='days after which user is allowed to change password (with --askPassword)')
     parser.add_option("-B", "--mustChangePassword", dest='mustChangePassword', help='days after which user must change password (with --askPassword)')
     parser.add_option("-X", "--accountDisabled", dest='accountDisabled', help='user account is disabled', action='store_true')
+    parser.add_option("-Y", "--accountEnabled", dest='accountDisabled', help='user account is disabled', action='store_false')
 
     (options, args) = parser.parse_args(argv)
     
@@ -995,16 +1001,16 @@ def manage_user(argv):
     acc = Account(cfgfile)
 
     if options.add:
-        uid = None; gid = None; sambaAccountFlags=None
+        uid = None; gid = None; sambaAcctFlags=None
 
         if options.uidNumber:
             uid = options.uidNumber
         if options.gidNumber:
             gid = options.gidNumber
         if options.accountDisabled:
-            sambaAccountFlags = '[UD         ]'
+            sambaAcctFlags = '[UD         ]'
         else:
-            sambaAccountFlags = '[U          ]'
+            sambaAcctFlags = '[U          ]'
 
 
         if options.sambaAccount:
@@ -1017,7 +1023,7 @@ def manage_user(argv):
                                     sambaHomeDrive=options.sambaHomeDrive,
                                     sambaProfilePath=options.sambaProfilePath,
                                     sambaLogonScript=options.sambaLogonScript,
-                                    sambaAccountFlags=sambaAccountFlags)
+                                    sambaAcctFlags=sambaAcctFlags)
         else:
             acc.createPosixUser(name=options.add, uid=uid, gid=gid,
                                   loginShell=options.loginShell)
@@ -1038,7 +1044,6 @@ def manage_user(argv):
         acc.deleteUser(options.delete)
 
     if options.modify:
-        print options.groupName
         if options.groupName:
             for groupname in options.groupName:
                 if options.remove:
@@ -1068,13 +1073,13 @@ def manage_user(argv):
         if options.sambaHomeDrive:
             acc.modifyUser(options.modify, 'sambaHomeDrive', options.sambaHomeDrive)
         if options.sambaProfilePath:
-            acc.modifyUser(options.modify, 's       ambaProfilePath', options.sambaProfilePath)
+            acc.modifyUser(options.modify, 'sambaProfilePath', options.sambaProfilePath)
         if options.sambaLogonScript:
             acc.modifyUser(options.modify, 'sambaLogonScript', options.sambaLogonScript)
         if options.accountDisabled == True:
-            acc.modifyUser(options.modify, 'sambaAccountFlags', '[UD         ]')
+            acc.modifyUser(options.modify, 'sambaAcctFlags', '[UD         ]')
         if options.accountDisabled == False:
-            acc.modifyUser(options.modify, 'sambaAccountFlags', '[U         ]')
+            acc.modifyUser(options.modify, 'sambaAcctFlags', '[U         ]')
 
 def manage_group(argv):
     usage = '%prog group [-h | --help] | -n <name> [Options]'

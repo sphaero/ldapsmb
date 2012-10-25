@@ -41,7 +41,7 @@ UMAIL=$(whiptail --inputbox \
 if whiptail --yesno \
         " Ok, I'm going to add:\n$UFIRSTNAME $USURNAME\n\nwith username:\n$UNAME\n\nDo you wish to proceed?" 15 50 \
         --title="Add a new user"
-then echo $LDAPSMB user -a $UNAME -n $UFIRSTNAME -N $USURNAME -M $UMAIL -X -S
+then $LDAPSMB user -a "$UNAME" -n "$UFIRSTNAME" -N "$USURNAME" -M "$UMAIL" -W -S
 else
     echo "Cancelled adding user $UNAME"
     exit 4
@@ -61,7 +61,7 @@ UGROUPLIST=`for G in $UGROUPS; do echo -en "$G $G off "; done`
 echo $UGROUPLIST
 SELECTED=$(whiptail --checklist \
         "Select groups for $UNAME: (use space to select)" 20 50 13	 \
-	$UGROUPLIST \
+        $UGROUPLIST \
         --title="Add a new user" 3>&1 1>&2 2>&3)
 if [ -z "$SELECTED" ]; then
     echo "No groups selected"
@@ -71,4 +71,4 @@ CMD="$LDAPSMB user -m $UNAME"
 for GRP in $SELECTED; do
     CMD="$CMD -G $GRP"
 done
-echo $CMD
+$CMD

@@ -44,8 +44,8 @@ UMAIL=`zenity --entry \
 if zenity --question \
         --title="Add a new user" \
         --text="Ok, I'm going to add:\n$UFIRSTNAME $USURNAME\n\nwith username:\n$UNAME\n\nDo you wish to proceed?"
-then $LDAPSMB user -a $UNAME -n $UFIRSTNAME -N $USURNAME -M $UMAIL -X -S
-else 
+then $LDAPSMB user -a "$UNAME" -n "$UFIRSTNAME" -N "$USURNAME" -M "$UMAIL" -W -S
+else
     echo "Cancelled adding user $UNAME"
     exit 4
 fi
