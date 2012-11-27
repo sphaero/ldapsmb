@@ -1107,30 +1107,30 @@ def manage_group(argv):
     if not options.add and not options.delete and not options.modify:
         parser.error('Please specify an action! Use option --help')
 
-    samba = Samba(cfgfile)
+    acc = Account(cfgfile)
 
     # add new group
     if options.add:
-        samba.createSambaGroup(options.name, options.gidNumber,
+        acc.createSambaGroup(options.name, options.gidNumber,
                                options.sambaSID, options.description,
                                options.groupType)
 
     # delete existing group
     if options.delete:
-        samba.deleteGroup(options.name)
+        acc.deleteGroup(options.name)
 
     # modify existing group
     if options.modify:
         if options.gidNumber:
-            samba.modifyGroup(options.name, 'gidNumber', options.gidNumber)
+            acc.modifyGroup(options.name, 'gidNumber', options.gidNumber)
         if options.sambaSID:
-            samba.modifyGroup(options.name, 'sambaSID', options.sambaSID)
+            acc.modifyGroup(options.name, 'sambaSID', options.sambaSID)
         if options.groupType:
-            samba.modifyGroup(options.name, 'sambaGroupType', options.groupType)
+            acc.modifyGroup(options.name, 'sambaGroupType', options.groupType)
         if options.displayName:
-            samba.modifyGroup(options.name, 'displayName', options.displayName)
+            acc.modifyGroup(options.name, 'displayName', options.displayName)
         if options.description:
-            samba.modifyGroup(options.name, 'description', options.description)
+            acc.modifyGroup(options.name, 'description', options.description)
 
 def manage_machine(argv):
     usage = '%prog machine [-h | --help] | -n <name> [Options]'
@@ -1158,32 +1158,32 @@ def manage_machine(argv):
     if not options.add and not options.delete and not options.modify:
         parser.error('Please specify an action! Use option --help')
 
-    samba = Samba(cfgfile)
+    acc = Account(cfgfile)
 
     # add new machine
     if options.add:
         if options.sambaAccount:
-            samba.createSambaMachine(options.name, options.uidNumber,
+            acc.createSambaMachine(options.name, options.uidNumber,
                                      options.gidNumber, options.displayName,
                                      options.sambaSID)
         else:
-            samba.createPosixMachine(options.name, options.uidNumber,
+            acc.createPosixMachine(options.name, options.uidNumber,
                                      options.gidNumber, options.displayName)
 
     # delete existing machine
     if options.delete:
-        samba.deleteMachine(options.name)
+        acc.deleteMachine(options.name)
 
     # modify existing machine
     if options.modify:
         if options.uidNumber:
-            samba.modifyMachine(options.name, 'uidNumber', options.uidNumber)
+            acc.modifyMachine(options.name, 'uidNumber', options.uidNumber)
         if options.gidNumber:
-            samba.modifyMachine(options.name, 'gidNumber', options.gidNumber)
+            acc.modifyMachine(options.name, 'gidNumber', options.gidNumber)
         if options.displayName:
-            samba.modifyMachine(options.name, 'displayName', options.displayName)
+            acc.modifyMachine(options.name, 'displayName', options.displayName)
         if options.sambaSID:
-            samba.modifyMachine(options.name, 'sambaSID', options.sambaSID)
+            acc.modifyMachine(options.name, 'sambaSID', options.sambaSID)
 
 def usage(argv):
     cmd = argv[0]
