@@ -144,7 +144,7 @@ class Account(LDAP):
         domain = self.cfg.getOp('samba', 'sambaDomain')
 
         dn = 'sambaDomainName=%s,%s' % (domain, suffix)
-        self.ldap_update_attribute(dn, 'gidNumber', gid)
+        self.ldap_update_attribute(dn, 'gidNumber', str(gid))
 
     def getNextFreeRid(self):
         suffix = self.cfg.getOp('samba', 'ldap suffix')
@@ -331,6 +331,42 @@ class Account(LDAP):
             print dn + ': Invalid attribute syntax. Is samba3 schema installed?'
         except ldap.LDAPError, e:
             print dn + ': ', e.args
+        else:
+            self.setNextFreeGid(int(gid) + 1)
+
+    def createPosixGroup(self, name, gid, description=None):
+        suffix       = self.cfg.getOp('samba', 'ldap suffix')
+        group_suffix = self.cfg.getOp('samba', 'ldap group suffix')
+        objClasses   = ['top', 'posixGroup']
+
+        if not gid:
+            gid = self.getNextFreeGid()
+
+        if not description:
+            description = ' '
+
+        dn    = 'cn=%s,%s,%s' % (name, group_suffix, suffix)
+
+        attrs = [
+                    ('objectClass', objClasses ),
+                    ('cn', [name]),
+                    ('description', [description]),
+                    ('gidNumber', [gid])
+                ]
+
+        try:
+            self.ldap_add(dn, attrs)
+            print dn + ': Successfully created'
+        except ldap.ALREADY_EXISTS, e:
+            print dn + ': Already exists'
+        except ldap.NO_SUCH_OBJECT, e:
+            print dn + ': No such object!'
+        except ldap.INVALID_SYNTAX, e:
+            print dn + ': Invalid attribute syntax'
+        except ldap.LDAPError, e:
+            print dn + ': ', e.args
+        else:
+            self.setNextFreeGid(int(gid) + 1)
 
     def deleteGroup(self, name):
         suffix       = self.cfg.getOp('samba', 'ldap suffix')
@@ -960,11 +996,11 @@ def do_population(argv):
     p.createSambaUsers()
 
 def manage_user(argv):
-    usage = '%prog user [-h | --help] | -n <name> [Options]'
+    usage = '%prog user [-h | --help] | <name> [Options]'
     parser = optparse.OptionParser(usage)
-    parser.add_option("-a", "--add", dest='add', help='add new user')
-    parser.add_option("-d", "--delete", dest='delete', help='delete existing user')
-    parser.add_option("-m", "--modify", dest='modify', help='modify user properties')
+    parser.add_option("-a", "--add", dest='add', help='add new user <name>')
+    parser.add_option("-d", "--delete", dest='delete', help='delete existing user <name>')
+    parser.add_option("-m", "--modify", dest='modify', help='modify properties of user <name>')
     parser.add_option("-R", "--remove", dest='remove', help='remove a user property (with --modify)', action='store_true')
     parser.add_option("-u", "--uidNumber", dest='uidNumber', help='create new user with uidNumber')
     parser.add_option("-g", "--gidNumber", dest='gidNumber', help='create new user with gidNumber')
@@ -1084,11 +1120,11 @@ def manage_user(argv):
 def manage_group(argv):
     usage = '%prog group [-h | --help] | -n <name> [Options]'
     parser = optparse.OptionParser(usage)
-    parser.add_option("-a", "--add", dest='add', help='add new group', action='store_true')
-    parser.add_option("-d", "--delete", dest='delete', help='delete existing group', action='store_true')
-    parser.add_option("-m", "--modify", dest='modify', help='modify existing group', action='store_true')
-    parser.add_option("-n", "--name", dest='name', help='name of the group')
+    parser.add_option("-a", "--add", dest='add', help='add new group <name>')
+    parser.add_option("-d", "--delete", dest='delete', help='delete existing group <name>')
+    parser.add_option("-m", "--modify", dest='modify', help='modify existing group <name>')
     parser.add_option("-g", "--gidNumber", dest='gidNumber', help='create new group with this gid')
+    parser.add_option("-S", "--sambaGroup", dest='sambaGroup', help='create Samba group otherwise Posix group is created', action='store_true')
     parser.add_option("-s", "--sambaSid", dest='sambaSID', help='group sambaSID')
     parser.add_option("-t", "--type", dest='groupType', help='Samba group type')
     parser.add_option("-N", "--displayName", dest='displayName', help='Windows full display name')
@@ -1102,8 +1138,6 @@ def manage_group(argv):
         parser.error('options -a and -m are mutually exclusive')
     if options.delete and options.modify:
         parser.error('options -d and -m are mutually exclusive')
-    if not options.name:
-        parser.error('Name is missing! Use option --help')
     if not options.add and not options.delete and not options.modify:
         parser.error('Please specify an action! Use option --help')
 
@@ -1111,26 +1145,30 @@ def manage_group(argv):
 
     # add new group
     if options.add:
-        acc.createSambaGroup(options.name, options.gidNumber,
+	if options.sambaGroup:
+            acc.createSambaGroup(options.add, options.gidNumber,
                                options.sambaSID, options.description,
                                options.groupType)
-
+        else:
+            acc.createPosixGroup(options.add, options.gidNumber,
+                               options.description)
+	
     # delete existing group
     if options.delete:
-        acc.deleteGroup(options.name)
+        acc.deleteGroup(options.delete)
 
     # modify existing group
     if options.modify:
         if options.gidNumber:
-            acc.modifyGroup(options.name, 'gidNumber', options.gidNumber)
+            acc.modifyGroup(options.modify, 'gidNumber', options.gidNumber)
         if options.sambaSID:
-            acc.modifyGroup(options.name, 'sambaSID', options.sambaSID)
+            acc.modifyGroup(options.modify, 'sambaSID', options.sambaSID)
         if options.groupType:
-            acc.modifyGroup(options.name, 'sambaGroupType', options.groupType)
+            acc.modifyGroup(options.modify, 'sambaGroupType', options.groupType)
         if options.displayName:
-            acc.modifyGroup(options.name, 'displayName', options.displayName)
+            acc.modifyGroup(options.modify, 'displayName', options.displayName)
         if options.description:
-            acc.modifyGroup(options.name, 'description', options.description)
+            acc.modifyGroup(options.modify, 'description', options.description)
 
 def manage_machine(argv):
     usage = '%prog machine [-h | --help] | -n <name> [Options]'
