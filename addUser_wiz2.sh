@@ -5,7 +5,9 @@
 # This script is not space friendly so if you have spaces in group names
 # for example expect the unexpected. I think...
 
-LDAPSMB="./ldapsmb"
+DIR=`dirname $0`
+
+LDAPSMB="$DIR/ldapsmb"
 
 UFIRSTNAME=$(whiptail --inputbox \
         "Enter user's firstname: (With Capitals)" 10 50 \
